@@ -88,11 +88,18 @@ app.get("/direct", async (req, res) => {
       target: response.data
     });
 
-  } catch (error) {
-    console.error(error.message);
+   } catch (error) {
+    console.error("Gateway upstream error:", {
+      message: error.message,
+      status: error.response?.status || null,
+      data: error.response?.data || null
+    });
 
     res.status(502).json({
-      error: error.message
+      error: "Gateway request failed",
+      upstream_status: error.response?.status || null,
+      upstream_response: error.response?.data || null,
+      message: error.message
     });
   }
 });
