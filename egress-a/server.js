@@ -4,21 +4,35 @@ const axios = require("axios");
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-const TARGET_URL =
+
+const DEFAULT_TARGET_URL =
   process.env.TARGET_URL ||
   "https://ip-egress-lab-1.onrender.com/inspect";
 
-const ALLOWED_GATEWAY_TOKEN = process.env.GATEWAY_TOKEN;
+const GATEWAY_TOKEN =
+  process.env.GATEWAY_TOKEN;
 
 function isAuthorized(req) {
-  const token = req.headers["x-gateway-token"];
-  return ALLOWED_GATEWAY_TOKEN && token === ALLOWED_GATEWAY_TOKEN;
+  const token =
+    req.headers["x-gateway-token"];
+
+  return (
+    GATEWAY_TOKEN &&
+    token === GATEWAY_TOKEN
+  );
 }
 
 app.get("/", (req, res) => {
   res.json({
     service: "Controlled Egress A",
-    status: "ok"
+    status: "ok",
+    version: "2.0",
+    endpoints: [
+      "/",
+      "/health",
+      "/self-test",
+      "/proxy"
+    ]
   });
 });
 
@@ -29,23 +43,34 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Temporary lab test.
-// This lets us verify which public IP Egress A uses.
+/*
+ * Direct Egress A → Target test
+ */
 app.get("/self-test", async (req, res) => {
   try {
-    const response = await axios.get(TARGET_URL, {
-      params: {
-        test_id: "egress-a-test"
-      },
-      timeout: 15000
-    });
+    const response = await axios.get(
+      DEFAULT_TARGET_URL,
+      {
+        params: {
+          test_id: "egress-a-self-test"
+        },
 
-    res.json({
+        timeout: 15000,
+
+        validateStatus: () => true
+      }
+    );
+
+    res.status(response.status).json({
       mode: "egress-a-self-test",
       target: response.data
     });
+
   } catch (error) {
-    console.error(error.message);
+    console.error(
+      "Self-test error:",
+      error.message
+    );
 
     res.status(502).json({
       error: "Egress A could not reach Target",
@@ -54,8 +79,14 @@ app.get("/self-test", async (req, res) => {
   }
 });
 
-// Gateway-only proxy endpoint.
+/*
+ * Gateway → Egress A → Target
+ */
 app.get("/proxy", async (req, res) => {
+
+  /*
+   * Only Gateway is allowed to use this endpoint.
+   */
   if (!isAuthorized(req)) {
     return res.status(403).json({
       error: "Unauthorized"
@@ -70,36 +101,100 @@ app.get("/proxy", async (req, res) => {
     });
   }
 
+  let parsed;
+
   try {
-    const parsed = new URL(target);
-
-    if (parsed.protocol !== "https:") {
-      return res.status(400).json({
-        error: "Only HTTPS targets are allowed"
-      });
-    }
-
-    const response = await axios.get(target, {
-  timeout: 15000,
-  validateStatus: () => true,
-  headers: {
-    "User-Agent": "IP-Egress-Lab/1.0",
-    "X-Original-Client-IP":
-      req.headers["x-original-client-ip"] || "",
-    "X-Forwarded-For":
-      req.headers["x-forwarded-for"] || ""
+    parsed = new URL(target);
+  } catch (error) {
+    return res.status(400).json({
+      error: "Invalid target URL"
+    });
   }
-});
 
+  /*
+   * Lab only allows HTTPS destinations.
+   */
+  if (parsed.protocol !== "https:") {
+    return res.status(400).json({
+      error: "Only HTTPS targets are allowed"
+    });
+  }
+
+  /*
+   * Customer IP metadata received from Gateway.
+   */
+  const customerIp =
+    req.headers["x-original-client-ip"] || "";
+
+  const forwardedFor =
+    req.headers["x-forwarded-for"] || "";
+
+  try {
+
+    /*
+     * Egress A → Target
+     *
+     * The actual network request originates
+     * from Egress A.
+     *
+     * Customer IP is preserved only as
+     * application-level metadata.
+     */
+    const response = await axios.get(
+      target,
+      {
+        params: {
+          test_id:
+            req.query.test_id || ""
+        },
+
+        timeout: 20000,
+
+        validateStatus: () => true,
+
+        headers: {
+          "User-Agent":
+            "IP-Egress-Lab/2.0",
+
+          "X-Original-Client-IP":
+            customerIp,
+
+          "X-Forwarded-For":
+            forwardedFor
+        }
+      }
+    );
+
+    console.log(
+      "Egress A → Target status:",
+      response.status
+    );
+
+    console.log(
+      "Customer IP metadata:",
+      customerIp
+    );
+
+    /*
+     * Return Target response to Gateway.
+     */
     res.status(response.status);
 
-    if (typeof response.data === "object") {
+    if (
+      response.data !== null &&
+      typeof response.data === "object"
+    ) {
       return res.json(response.data);
     }
 
     return res.send(response.data);
+
   } catch (error) {
-    console.error(error.message);
+
+    console.error(
+      "Proxy error:",
+      error.message
+    );
 
     return res.status(502).json({
       error: "Egress request failed",
@@ -108,6 +203,12 @@ app.get("/proxy", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Egress A listening on ${PORT}`);
-});
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `Egress A listening on port ${PORT}`
+    );
+  }
+);
