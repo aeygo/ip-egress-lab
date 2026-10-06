@@ -29,10 +29,30 @@ app.get("/", (req, res) => {
   res.json({
     service: "Controlled IP Egress Gateway",
     status: "ok",
-    endpoints: [
-      "/direct"
-    ]
+   endpoints: [
+  "/direct",
+  "/egress-ip"
+]
   });
+});
+app.get("/egress-ip", async (req, res) => {
+  try {
+    const response = await axios.get("https://api.ipify.org?format=json", {
+      timeout: 10000
+    });
+
+    res.json({
+      service: "Controlled IP Egress Gateway",
+      egress_ip: response.data.ip
+    });
+
+  } catch (error) {
+    console.error(error.message);
+
+    res.status(502).json({
+      error: error.message
+    });
+  }
 });
 
 app.get("/direct", async (req, res) => {
