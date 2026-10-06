@@ -11,25 +11,42 @@ function generateTestId() {
   return crypto.randomBytes(16).toString("hex");
 }
 
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+
+  return (
+    req.headers["x-real-ip"] ||
+    req.socket?.remoteAddress ||
+    null
+  );
+}
+
 app.get("/", (req, res) => {
   res.json({
     service: "Controlled IP Egress Gateway",
     status: "ok",
     endpoints: [
-      "/direct",
-      "/test?egress=A",
-      "/test?egress=B"
+      "/direct"
     ]
   });
 });
 
 app.get("/direct", async (req, res) => {
   const testId = generateTestId();
+  const customerIp = getClientIp(req);
 
   try {
     const response = await axios.get(TARGET_URL, {
       params: {
         test_id: testId
+      },
+      headers: {
+        "X-Original-Client-IP": customerIp || "",
+        "X-Forwarded-For": customerIp || ""
       },
       timeout: 15000
     });
@@ -37,8 +54,10 @@ app.get("/direct", async (req, res) => {
     res.json({
       mode: "direct",
       test_id: testId,
+      customer_ip_detected_by_gateway: customerIp,
       target: response.data
     });
+
   } catch (error) {
     console.error(error.message);
 
