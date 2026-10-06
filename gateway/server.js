@@ -5,7 +5,11 @@ const crypto = require("crypto");
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+
 const TARGET_URL = process.env.TARGET_URL;
+const EGRESS_TARGET_URL =
+  process.env.EGRESS_TARGET_URL ||
+  "https://ip-egress-lab-1.onrender.com/inspect";
 
 function generateTestId() {
   return crypto.randomBytes(16).toString("hex");
@@ -29,28 +33,34 @@ app.get("/", (req, res) => {
   res.json({
     service: "Controlled IP Egress Gateway",
     status: "ok",
-   endpoints: [
-  "/direct",
-  "/egress-ip"
-]
+    version: "2.0",
+    endpoints: [
+      "/",
+      "/direct",
+      "/egress-ip"
+    ]
   });
 });
+
 app.get("/egress-ip", async (req, res) => {
   try {
-    const response = await axios.get("https://api.ipify.org?format=json", {
-      timeout: 10000
-    });
+    const response = await axios.get(
+      "https://api.ipify.org?format=json",
+      {
+        timeout: 10000
+      }
+    );
 
     res.json({
       service: "Controlled IP Egress Gateway",
       egress_ip: response.data.ip
     });
-
   } catch (error) {
-    console.error(error.message);
+    console.error("egress-ip error:", error.message);
 
     res.status(502).json({
-      error: error.message
+      error: "Could not determine egress IP",
+      message: error.message
     });
   }
 });
@@ -59,51 +69,89 @@ app.get("/direct", async (req, res) => {
   const testId = generateTestId();
   const customerIp = getClientIp(req);
 
-  // TARGET_URL should currently point to Egress A /proxy
-  const egressUrl = TARGET_URL;
-
-  // Actual Target endpoint that Egress A should call
-  const destinationUrl =
-    process.env.EGRESS_TARGET_URL ||
-    "https://ip-egress-lab-1.onrender.com/inspect";
+  if (!TARGET_URL) {
+    return res.status(500).json({
+      error: "TARGET_URL is not configured"
+    });
+  }
 
   try {
-    const response = await axios.get(egressUrl, {
+    /*
+     * Gateway → Egress A
+     *
+     * TARGET_URL should point to:
+     * https://ip-egress-lab-3.onrender.com/proxy
+     */
+
+    const response = await axios.get(TARGET_URL, {
       params: {
-        url: destinationUrl,
+        url: EGRESS_TARGET_URL,
         test_id: testId
       },
+
       headers: {
         "X-Original-Client-IP": customerIp || "",
         "X-Forwarded-For": customerIp || "",
-        "X-Gateway-Token": process.env.EGRESS_TOKEN || ""
+        "X-Gateway-Token":
+          process.env.EGRESS_TOKEN || ""
       },
-      timeout: 15000
+
+      timeout: 20000,
+
+      validateStatus: () => true
     });
+
+    console.log("Gateway → Egress A status:", response.status);
+    console.log("Gateway → Egress A response:", response.data);
+
+    if (response.status >= 400) {
+      return res.status(502).json({
+        error: "Egress A returned an error",
+        upstream_status: response.status,
+        upstream_response: response.data,
+        test_id: testId,
+        customer_ip_detected_by_gateway: customerIp
+      });
+    }
 
     res.json({
       mode: "gateway-egress-a-target",
+
       test_id: testId,
-      customer_ip_detected_by_gateway: customerIp,
+
+      customer_ip_detected_by_gateway:
+        customerIp,
+
+      gateway: {
+        service: "Gateway",
+        status: "ok"
+      },
+
+      egress: {
+        service: "Egress A",
+        status: "ok"
+      },
+
       target: response.data
     });
 
-   } catch (error) {
-    console.error("Gateway upstream error:", {
-      message: error.message,
-      status: error.response?.status || null,
-      data: error.response?.data || null
-    });
+  } catch (error) {
+    console.error(
+      "Gateway /direct error:",
+      error.message
+    );
 
-    res.status(502).json({
-      error: "Gateway request failed",
-      upstream_status: error.response?.status || null,
-      upstream_response: error.response?.data || null,
-      message: error.message
+    return res.status(502).json({
+      error: "Gateway could not reach Egress A",
+      message: error.message,
+      test_id: testId,
+      customer_ip_detected_by_gateway: customerIp
     });
   }
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Gateway listening on ${PORT}`);
+  console.log(
+    `Gateway listening on port ${PORT}`
+  );
 });
