@@ -59,21 +59,30 @@ app.get("/direct", async (req, res) => {
   const testId = generateTestId();
   const customerIp = getClientIp(req);
 
+  // TARGET_URL should currently point to Egress A /proxy
+  const egressUrl = TARGET_URL;
+
+  // Actual Target endpoint that Egress A should call
+  const destinationUrl =
+    process.env.EGRESS_TARGET_URL ||
+    "https://ip-egress-lab-1.onrender.com/inspect";
+
   try {
-    const response = await axios.get(TARGET_URL, {
+    const response = await axios.get(egressUrl, {
       params: {
+        url: destinationUrl,
         test_id: testId
       },
       headers: {
         "X-Original-Client-IP": customerIp || "",
         "X-Forwarded-For": customerIp || "",
-        "Authorization": `Bearer ${process.env.EGRESS_TOKEN || ""}`
+        "X-Gateway-Token": process.env.EGRESS_TOKEN || ""
       },
       timeout: 15000
     });
 
     res.json({
-      mode: "direct",
+      mode: "gateway-egress-a-target",
       test_id: testId,
       customer_ip_detected_by_gateway: customerIp,
       target: response.data
