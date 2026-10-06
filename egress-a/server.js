@@ -80,12 +80,16 @@ app.get("/proxy", async (req, res) => {
     }
 
     const response = await axios.get(target, {
-      timeout: 15000,
-      validateStatus: () => true,
-      headers: {
-        "User-Agent": "IP-Egress-Lab/1.0"
-      }
-    });
+  timeout: 15000,
+  validateStatus: () => true,
+  headers: {
+    "User-Agent": "IP-Egress-Lab/1.0",
+    "X-Original-Client-IP":
+      req.headers["x-original-client-ip"] || "",
+    "X-Forwarded-For":
+      req.headers["x-forwarded-for"] || ""
+  }
+});
 
     res.status(response.status);
 
