@@ -66,7 +66,8 @@ app.get("/direct", async (req, res) => {
       },
       headers: {
         "X-Original-Client-IP": customerIp || "",
-        "X-Forwarded-For": customerIp || ""
+        "X-Forwarded-For": customerIp || "",
+        "Authorization": `Bearer ${process.env.EGRESS_TOKEN || ""}`
       },
       timeout: 15000
     });
