@@ -26,6 +26,13 @@ app.get("/inspect", (req, res) => {
     customer_ip:
       req.headers["x-original-client-ip"] || null,
 
+        // Observed second entry in the forwarding chain.
+    // In this Render lab, this is the Gateway's observed public egress IP.
+    observed_gateway_ip:
+      (req.headers["x-forwarded-for"] || "")
+        .split(",")
+        .map(ip => ip.trim())[1] || null,
+
     // Forwarded chain
     forwarded_for:
       req.headers["x-forwarded-for"] || null,
