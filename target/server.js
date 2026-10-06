@@ -18,11 +18,15 @@ app.get("/inspect", (req, res) => {
   const result = {
     timestamp: new Date().toISOString(),
 
-    source_ip: req.ip || null,
-
-    socket_remote_address:
+    // Actual network connection reaching this Target
+    network_source_ip:
       req.socket?.remoteAddress || null,
 
+    // IP explicitly forwarded by our Gateway
+    customer_ip:
+      req.headers["x-original-client-ip"] || null,
+
+    // Forwarded chain
     forwarded_for:
       req.headers["x-forwarded-for"] || null,
 
