@@ -7,6 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const TARGET_URL = process.env.TARGET_URL;
+
 const EGRESS_TARGET_URL =
   process.env.EGRESS_TARGET_URL ||
   "https://ip-egress-lab-1.onrender.com/inspect";
@@ -33,7 +34,7 @@ app.get("/", (req, res) => {
   res.json({
     service: "Controlled IP Egress Gateway",
     status: "ok",
-    version: "2.0",
+    version: "2.1",
     endpoints: [
       "/",
       "/direct",
@@ -56,7 +57,10 @@ app.get("/egress-ip", async (req, res) => {
       egress_ip: response.data.ip
     });
   } catch (error) {
-    console.error("egress-ip error:", error.message);
+    console.error(
+      "egress-ip error:",
+      error.message
+    );
 
     res.status(502).json({
       error: "Could not determine egress IP",
@@ -67,7 +71,9 @@ app.get("/egress-ip", async (req, res) => {
 
 app.get("/direct", async (req, res) => {
   const testId = generateTestId();
-  const customerIp = getClientIp(req);
+
+  const customerIp =
+    getClientIp(req);
 
   if (!TARGET_URL) {
     return res.status(500).json({
@@ -77,50 +83,76 @@ app.get("/direct", async (req, res) => {
 
   try {
     /*
-     * Gateway → Egress A
-     *
-     * TARGET_URL should point to:
-     * https://ip-egress-lab-3.onrender.com/proxy
+     * Send the Egress A routing URL separately.
+     * All incoming query parameters are preserved.
      */
+    const response = await axios.get(
+      TARGET_URL,
+      {
+        params: {
+          url: EGRESS_TARGET_URL,
+          ...req.query,
+          lab_gateway_test_id: testId
+        },
 
-    const response = await axios.get(TARGET_URL, {
-      params: {
-        url: EGRESS_TARGET_URL,
-        test_id: testId
-      },
+        headers: {
+          "X-Original-Client-IP":
+            customerIp || "",
 
-      headers: {
-        "X-Original-Client-IP": customerIp || "",
-        "X-Forwarded-For": customerIp || "",
-        "X-Gateway-Token":
-          process.env.EGRESS_TOKEN || ""
-      },
+          "X-Forwarded-For":
+            customerIp || "",
 
-      timeout: 20000,
+          "X-Gateway-Token":
+            process.env.EGRESS_TOKEN || ""
+        },
 
-      validateStatus: () => true
-    });
+        timeout: 20000,
 
-    console.log("Gateway → Egress A status:", response.status);
-    console.log("Gateway → Egress A response:", response.data);
+        validateStatus: () => true
+      }
+    );
+
+    console.log(
+      "Gateway → Egress A status:",
+      response.status
+    );
+
+    console.log(
+      "Gateway → Egress A response:",
+      response.data
+    );
 
     if (response.status >= 400) {
       return res.status(502).json({
-        error: "Egress A returned an error",
-        upstream_status: response.status,
-        upstream_response: response.data,
-        test_id: testId,
-        customer_ip_detected_by_gateway: customerIp
+        error:
+          "Egress A returned an error",
+
+        upstream_status:
+          response.status,
+
+        upstream_response:
+          response.data,
+
+        test_id:
+          testId,
+
+        customer_ip_detected_by_gateway:
+          customerIp
       });
     }
 
-    res.json({
-      mode: "gateway-egress-a-target",
+    return res.json({
+      mode:
+        "gateway-egress-a-target",
 
-      test_id: testId,
+      test_id:
+        testId,
 
       customer_ip_detected_by_gateway:
         customerIp,
+
+      incoming_query:
+        req.query,
 
       gateway: {
         service: "Gateway",
@@ -132,7 +164,8 @@ app.get("/direct", async (req, res) => {
         status: "ok"
       },
 
-      target: response.data
+      target:
+        response.data
     });
 
   } catch (error) {
@@ -142,16 +175,27 @@ app.get("/direct", async (req, res) => {
     );
 
     return res.status(502).json({
-      error: "Gateway could not reach Egress A",
-      message: error.message,
-      test_id: testId,
-      customer_ip_detected_by_gateway: customerIp
+      error:
+        "Gateway could not reach Egress A",
+
+      message:
+        error.message,
+
+      test_id:
+        testId,
+
+      customer_ip_detected_by_gateway:
+        customerIp
     });
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `Gateway listening on port ${PORT}`
-  );
-});
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `Gateway listening on port ${PORT}`
+    );
+  }
+);
