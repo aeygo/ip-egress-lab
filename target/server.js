@@ -2,15 +2,25 @@ const express = require("express");
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+  process.env.PORT || 3000;
 
-app.set("trust proxy", true);
+app.set(
+  "trust proxy",
+  true
+);
 
 app.get("/", (req, res) => {
   res.json({
-    service: "IP Egress Lab Target",
-    status: "ok",
-    version: "2.1",
+    service:
+      "IP Egress Lab Target",
+
+    status:
+      "ok",
+
+    version:
+      "2.2",
+
     endpoints: [
       "/",
       "/inspect",
@@ -22,7 +32,9 @@ app.get("/", (req, res) => {
 app.get("/inspect", (req, res) => {
 
   const forwardedFor =
-    req.headers["x-forwarded-for"] || "";
+    req.headers[
+      "x-forwarded-for"
+    ] || "";
 
   const forwardedIps =
     forwardedFor
@@ -31,7 +43,9 @@ app.get("/inspect", (req, res) => {
       .filter(Boolean);
 
   const customerIp =
-    req.headers["x-original-client-ip"] || null;
+    req.headers[
+      "x-original-client-ip"
+    ] || null;
 
   const result = {
 
@@ -39,58 +53,101 @@ app.get("/inspect", (req, res) => {
       new Date().toISOString(),
 
     /*
-     * Immediate network connection seen by
-     * the Target application.
-     *
-     * This is NOT the customer IP.
+     * Immediate network connection
+     * seen by the Target application.
      */
     network_source_ip:
-      req.socket?.remoteAddress || null,
+      req.socket?.remoteAddress ||
+      null,
 
     /*
-     * Customer IP detected by Gateway and
-     * forwarded through our controlled lab.
+     * Customer IP carried as
+     * application-level metadata.
      */
     customer_ip:
       customerIp,
 
     /*
-     * The IP that our controlled website
-     * should associate with this visitor.
+     * Website tracking IP used
+     * by this controlled lab.
      */
     website_tracking_ip:
       customerIp,
 
-    /*
-     * Forwarding chain observed by Target.
-     */
     forwarded_for:
-      req.headers["x-forwarded-for"] || null,
+      req.headers[
+        "x-forwarded-for"
+      ] || null,
 
     forwarded_ip_list:
       forwardedIps,
 
-    /*
-     * Useful only for this controlled Render
-     * experiment. Do not interpret this as
-     * universal public-IP semantics.
-     */
     observed_gateway_ip:
       forwardedIps.length > 1
         ? forwardedIps[1]
         : null,
 
     real_ip:
-      req.headers["x-real-ip"] || null,
+      req.headers[
+        "x-real-ip"
+      ] || null,
+
+    /*
+     * Complete query string
+     * received by Target.
+     */
+    query_parameters:
+      req.query,
+
+    /*
+     * Individual parameters
+     * for easy inspection.
+     */
+    irclickid:
+      req.query.irclickid ||
+      null,
+
+    lab_click_id:
+      req.query.lab_click_id ||
+      null,
+
+    irgwc:
+      req.query.irgwc ||
+      null,
+
+    utm_source:
+      req.query.utm_source ||
+      null,
+
+    utm_medium:
+      req.query.utm_medium ||
+      null,
+
+    utm_campaign:
+      req.query.utm_campaign ||
+      null,
+
+    utm_content:
+      req.query.utm_content ||
+      null,
+
+    lab_gateway_test_id:
+      req.query.lab_gateway_test_id ||
+      null,
 
     test_id:
-      req.query.test_id || null,
+      req.query.test_id ||
+      null,
 
     user_agent:
-      req.headers["user-agent"] || null,
+      req.headers[
+        "user-agent"
+      ] || null,
 
     host:
-      req.headers["host"] || null
+      req.headers[
+        "host"
+      ] || null
   };
 
   console.log(
@@ -100,20 +157,18 @@ app.get("/inspect", (req, res) => {
   res.json(result);
 });
 
-
 /*
- * CONTROLLED WEBSITE TEST PAGE
- *
- * This page demonstrates that the website can
- * read the customer IP forwarded by our Gateway.
+ * Controlled website test page.
  */
 app.get("/test-page", (req, res) => {
 
   const customerIp =
-    req.headers["x-original-client-ip"] ||
-    "Unknown";
+    req.headers[
+      "x-original-client-ip"
+    ] || "Unknown";
 
   const testId =
+    req.query.lab_gateway_test_id ||
     req.query.test_id ||
     "No test ID";
 
@@ -123,8 +178,8 @@ app.get("/test-page", (req, res) => {
 
   res.send(`
     <!DOCTYPE html>
-
     <html>
+
       <head>
 
         <meta charset="UTF-8">
@@ -134,7 +189,9 @@ app.get("/test-page", (req, res) => {
           content="width=device-width, initial-scale=1.0"
         >
 
-        <title>IP Egress Lab Test</title>
+        <title>
+          IP Egress Lab Test
+        </title>
 
         <style>
 
@@ -188,11 +245,14 @@ app.get("/test-page", (req, res) => {
 
       <body>
 
-        <h1>IP Egress Lab</h1>
+        <h1>
+          IP Egress Lab
+        </h1>
 
         <div class="box">
 
           <div class="row">
+
             <div class="label">
               Website Tracking IP
             </div>
@@ -200,10 +260,11 @@ app.get("/test-page", (req, res) => {
             <div class="value">
               ${customerIp}
             </div>
+
           </div>
 
-
           <div class="row">
+
             <div class="label">
               Network Source IP
             </div>
@@ -211,10 +272,11 @@ app.get("/test-page", (req, res) => {
             <div class="value">
               ${networkSourceIp}
             </div>
+
           </div>
 
-
           <div class="row">
+
             <div class="label">
               Test ID
             </div>
@@ -222,30 +284,37 @@ app.get("/test-page", (req, res) => {
             <div class="value">
               ${testId}
             </div>
+
           </div>
 
-
           <div class="note">
-            Website Tracking IP is the customer IP
-            forwarded by the controlled Gateway.
-            Network Source IP is the immediate
-            connection seen by the Target service.
+
+            Website Tracking IP is the
+            customer IP forwarded by the
+            controlled Gateway.
+
+            Network Source IP is the
+            immediate connection seen by
+            the Target service.
+
           </div>
 
         </div>
 
       </body>
+
     </html>
   `);
 });
-
 
 app.listen(
   PORT,
   "0.0.0.0",
   () => {
+
     console.log(
       `IP Egress Lab Target listening on port ${PORT}`
     );
+
   }
 );
