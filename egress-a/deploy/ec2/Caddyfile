@@ -1,0 +1,12 @@
+# Replace with the DNS name that resolves to this instance's Elastic IP.
+# Caddy obtains and renews the TLS certificate automatically.
+#
+# Caddy ignores X-Forwarded-For from clients that are not trusted proxies and sets it to the
+# real peer address, so Egress A runs with TRUST_PROXY_HOPS=1.
+egress-a.example.com {
+	request_body {
+		max_size 32KB
+	}
+
+	reverse_proxy 127.0.0.1:3000
+}

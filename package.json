@@ -1,0 +1,15 @@
+{
+  "name": "ip-egress-lab",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Controlled lab that correlates requester IP, irclickid and event ID across Gateway, Egress A and Target.",
+  "engines": {
+    "node": "22.x || 24.x"
+  },
+  "scripts": {
+    "install:all": "npm ci --prefix gateway && npm ci --prefix egress-a && npm ci --prefix target",
+    "sync:shared": "node scripts/sync-shared.js",
+    "check:shared": "node scripts/sync-shared.js --check",
+    "test": "npm run check:shared && npm test --prefix gateway && npm test --prefix egress-a && npm test --prefix target && node --test \"test/**/*.test.js\""
+  }
+}

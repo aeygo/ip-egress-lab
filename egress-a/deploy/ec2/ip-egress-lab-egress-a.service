@@ -1,0 +1,36 @@
+[Unit]
+Description=IP Egress Lab - Egress A
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=iplab
+Group=iplab
+WorkingDirectory=/opt/ip-egress-lab/egress-a
+EnvironmentFile=/etc/ip-egress-lab/egress-a.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+# Hardening. The service only needs to read its code and open outbound HTTPS connections.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
