@@ -1,12 +1,16 @@
-
 {
   "name": "ip-egress-lab-target",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "private": true,
+  "engines": {
+    "node": "22.x || 24.x"
+  },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.1"
   }
 }
